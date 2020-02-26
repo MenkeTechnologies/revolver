@@ -264,7 +264,7 @@ function _revolver_demo() {
 ###
 # Handle command input
 ###
-function _revolver() {
+function revolver() {
   # Get the context from the first parameter
   local help version style ctx="$1"
 
@@ -315,4 +315,4 @@ function _revolver() {
   esac
 }
 
-_revolver "$@"
+revolver "$@"
