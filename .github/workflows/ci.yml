@@ -28,12 +28,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zsh curl git
 
-      - name: Set up zunit
+      - name: Set up zunit + register THIS repo's bin/revolver on PATH
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/MenkeTechnologies/zunit
           (cd zunit && ./build.zsh)
           echo "$PWD/zunit" >> "$GITHUB_PATH"
+          # zunit requires the `revolver` binary as a hard dependency.
+          # We ARE the revolver repo — register its own bin/ on PATH.
+          chmod +x revolver/bin/revolver
+          echo "$PWD/revolver/bin" >> "$GITHUB_PATH"
 
       - name: Set terminal env
         run: |
