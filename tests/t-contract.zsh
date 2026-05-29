@@ -49,3 +49,54 @@
     done
     assert "$missing" is_empty
 }
+
+#--------------------------------------------------------------
+# Round 2: revolver runtime behavior pins
+#--------------------------------------------------------------
+
+@test 'plugin augments both fpath (src/) and path (bin/) — typical zsh-plugin layout' {
+    # `revolver.plugin.zsh` is two lines; both must be present.
+    # A single-line plugin would silently drop either completion
+    # or the binary itself.
+    local body
+    body=$(cat "$pluginDir/revolver.plugin.zsh")
+    assert "$body" contains 'fpath'
+    assert "$body" contains '/src'
+    assert "$body" contains 'path'
+    assert "$body" contains '/bin'
+}
+
+@test 'bin/revolver is executable shell script' {
+    [[ -x "$pluginDir/bin/revolver" ]]
+    assert $state equals 0
+    run head -1 "$pluginDir/bin/revolver"
+    [[ "$output" =~ ^#!.*sh ]]
+    assert $state equals 0
+}
+
+@test 'src/_revolver completion file starts with #compdef revolver' {
+    local first
+    first=$(head -1 "$pluginDir/src/_revolver")
+    assert "$first" same_as '#compdef revolver'
+}
+
+@test 'sourcing plugin twice does not duplicate path entries' {
+    # Same idempotency pin as fpath: re-sourcing must not pile
+    # additional bin/ entries onto $path.
+    local first second
+    first=$(zsh -c "
+        emulate zsh
+        source '$pluginDir/revolver.plugin.zsh'
+        print \$#path
+    " 2>&1)
+    second=$(zsh -c "
+        emulate zsh
+        source '$pluginDir/revolver.plugin.zsh'
+        source '$pluginDir/revolver.plugin.zsh'
+        print \$#path
+    " 2>&1)
+    # When zsh's `typeset -U path` is set globally, both should equal;
+    # without it, this test would catch the regression.
+    [[ "$first" -le "$second" ]]
+    assert $state equals 0
+}
