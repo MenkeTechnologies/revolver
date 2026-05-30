@@ -232,3 +232,66 @@
     " 2>&1)
     assert "$found" contains 'revolver'
 }
+
+#--------------------------------------------------------------
+# Round 3: fresh-surface pins (completion + spinner metadata)
+#--------------------------------------------------------------
+
+@test 'completion declares every public verb (start|update|stop|demo) in _commands' {
+    # Pin: src/_revolver _commands array must enumerate every verb
+    # accepted by the dispatcher's case branch. If a refactor adds
+    # a 5th verb (e.g. `restart`) and forgets the completion entry,
+    # users get the verb working without tab-complete.
+    local body
+    body=$(cat "$compFile")
+    assert "$body" contains "'start:"
+    assert "$body" contains "'update:"
+    assert "$body" contains "'stop:"
+    assert "$body" contains "'demo:"
+}
+
+@test 'completion wires both -h/--help and -v/--version option pairs' {
+    # Pin: the _arguments call enumerates both short+long forms in
+    # parens-separated bundles. If a refactor drops the short form
+    # from _arguments, completion silently stops offering -h / -v.
+    local body
+    body=$(cat "$compFile")
+    assert "$body" contains '(-h --help)'
+    assert "$body" contains '(-v --version)'
+}
+
+@test 'spinner catalogue floor: at least 50 styles declared' {
+    # Tighter floor than the existing 30+ pin. revolver currently
+    # ships 55; a drop below 50 means a substantial chunk of the
+    # catalogue silently disappeared from the literal.
+    local count
+    count=$(awk '/^_revolver_spinners=\(/,/^\)/' "$revBin" | grep -cE "^  '")
+    local result=$([[ "$count" -ge 50 ]] && echo yes || echo "no:$count")
+    assert "$result" same_as 'yes'
+}
+
+@test 'every spinner interval is < 1.0 second (spinner not pulser)' {
+    # Pin: the catalogue's first field is a sleep interval in seconds.
+    # A value >=1.0 would make the "spinner" stutter visibly between
+    # frames — fail the UX contract. Ignore the `flip` entry, whose
+    # frames contain a backtick that confuses the simple awk split.
+    local bad
+    bad=$(awk -F"'" '/^  / && $2 != "flip" { split($4, a, " "); if (a[1]+0 >= 1.0) print $2 ":" a[1] }' "$revBin")
+    assert "$bad" is_empty
+}
+
+@test 'completion declares no verbs that the dispatcher does not handle' {
+    # Reverse direction of the prior pin: every _commands entry must
+    # correspond to a real dispatcher branch (start|update|stop|demo).
+    # Catches stale completion entries that survived a verb removal.
+    local extra verbs verb
+    extra=""
+    verbs=$(awk -F"'" '/^  '\''[a-z]+:/ { print $2 }' "$compFile" | awk -F: '{print $1}')
+    for verb in ${(f)verbs}; do
+        case "$verb" in
+            start|update|stop|demo) ;;
+            *) extra="$extra $verb" ;;
+        esac
+    done
+    assert "$extra" is_empty
+}
